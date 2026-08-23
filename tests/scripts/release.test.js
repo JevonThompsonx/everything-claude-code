@@ -8,6 +8,22 @@ const path = require('path');
 
 const scriptPath = path.join(__dirname, '..', '..', 'scripts', 'release.sh');
 const source = fs.readFileSync(scriptPath, 'utf8');
+const releaseWorkflowPath = path.join(__dirname, '..', '..', '.github', 'workflows', 'release.yml');
+const reusableReleaseWorkflowPath = path.join(
+  __dirname,
+  '..',
+  '..',
+  '.github',
+  'workflows',
+  'reusable-release.yml'
+);
+const ciWorkflowPath = path.join(__dirname, '..', '..', '.github', 'workflows', 'ci.yml');
+const releaseWorkflowSource = fs.readFileSync(releaseWorkflowPath, 'utf8');
+const reusableReleaseWorkflowSource = fs.readFileSync(reusableReleaseWorkflowPath, 'utf8');
+const ciWorkflowSource = fs.readFileSync(ciWorkflowPath, 'utf8');
+const rootReadmePath = path.join(__dirname, '..', '..', 'README.md');
+const rootReadmeSource = fs.readFileSync(rootReadmePath, 'utf8');
+const normalizedCiWorkflowSource = ciWorkflowSource.replace(/\r\n/g, '\n');
 
 function test(name, fn) {
   try {
@@ -61,6 +77,116 @@ function runTests() {
     assert.ok(
       packCheckIndex < commitIndex,
       'build-opencode.test.js should run before the release commit is created'
+    );
+  })) passed++; else failed++;
+
+  if (test('release script supports prerelease semver and release heading sync', () => {
+    assert.ok(
+      source.includes('2.0.0-rc.1'),
+      'release.sh should document an accepted prerelease semver example'
+    );
+    assert.ok(
+      source.includes('(-[0-9A-Za-z.-]+)?'),
+      'release.sh should allow prerelease semver suffixes'
+    );
+    assert.ok(
+      source.includes('update_latest_release_heading "$ROOT_ZH_CN_README_FILE"'),
+      'release.sh should update localized latest-release headings that plugin-manifest.test.js verifies'
+    );
+    assert.ok(
+      source.includes('Error: could not update release heading for v${oldVersion} in ${file}'),
+      'release.sh should fail loudly when a required release heading is absent'
+    );
+  })) passed++; else failed++;
+
+  if (test('a 2.2 bump preserves historical root README release headings', () => {
+    const historicalHeading = rootReadmeSource.match(/^### v2\.0\.0:.*$/m);
+    assert.ok(historicalHeading, 'README fixture should contain the historical v2.0.0 heading');
+    assert.ok(
+      source.includes('const oldVersion = process.argv[3]'),
+      'release heading sync should receive the version being replaced'
+    );
+    assert.ok(
+      source.includes('escape(oldVersion)'),
+      'release heading sync should target the current release version exactly'
+    );
+    assert.ok(
+      !source.includes('/^### v[0-9]+\\.[0-9]+\\.[0-9]+'),
+      'release heading sync must not relabel the first version-shaped heading as the new release'
+    );
+
+    const oldVersion = '2.1.0';
+    const nextVersion = '2.2.0';
+    const escapedOldVersion = oldVersion.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const simulated = rootReadmeSource.replace(
+      new RegExp(`^### v${escapedOldVersion}( .*)$`, 'm'),
+      `### v${nextVersion}$1`
+    );
+    assert.ok(
+      simulated.includes(historicalHeading[0]),
+      'syncing the current release must leave the historical v2.0.0 heading unchanged'
+    );
+  })) passed++; else failed++;
+
+  if (test('release script rejects same-version reruns with direct tag guidance', () => {
+    assert.ok(
+      source.includes('if [[ "$OLD_VERSION" == "$VERSION" ]]'),
+      'release.sh should detect metadata that already declares the requested version'
+    );
+    assert.ok(
+      source.includes('echo "  git tag \\"v$VERSION\\""') &&
+        source.includes('echo "  git push origin \\"v$VERSION\\""'),
+      'same-version guidance should point maintainers to the tag-driven publish path'
+    );
+  })) passed++; else failed++;
+
+  if (test('release workflows mark prerelease tags as GitHub prereleases', () => {
+    assert.ok(
+      releaseWorkflowSource.includes('prerelease: ${{ contains(github.ref_name, \'-\') }}'),
+      'release.yml should mark hyphenated tag pushes as GitHub prereleases'
+    );
+    assert.ok(
+      releaseWorkflowSource.includes('make_latest: ${{ contains(github.ref_name, \'-\') && \'false\' || \'true\' }}'),
+      'release.yml should avoid making hyphenated prereleases the latest GitHub release'
+    );
+    assert.ok(
+      reusableReleaseWorkflowSource.includes('prerelease: ${{ contains(inputs.tag, \'-\') }}'),
+      'reusable-release.yml should mark hyphenated manual tags as GitHub prereleases'
+    );
+    assert.ok(
+      reusableReleaseWorkflowSource.includes('make_latest: ${{ contains(inputs.tag, \'-\') && \'false\' || \'true\' }}'),
+      'reusable-release.yml should avoid making hyphenated prereleases the latest GitHub release'
+    );
+  })) passed++; else failed++;
+
+  if (test('reusable release checks out the requested tag before validating and publishing', () => {
+    const checkoutIndex = reusableReleaseWorkflowSource.indexOf('uses: actions/checkout@');
+    const refIndex = reusableReleaseWorkflowSource.indexOf('ref: refs/tags/${{ inputs.tag }}');
+    const validateIndex = reusableReleaseWorkflowSource.indexOf('name: Validate version tag');
+
+    assert.ok(checkoutIndex >= 0, 'reusable-release.yml should check out repository content');
+    assert.ok(refIndex >= 0, 'reusable-release.yml checkout should require inputs.tag to resolve as a tag');
+    assert.ok(validateIndex >= 0, 'reusable-release.yml should validate requested tag');
+    assert.ok(
+      checkoutIndex < refIndex && refIndex < validateIndex,
+      'reusable release should check out inputs.tag before tag validation and publish steps'
+    );
+  })) passed++; else failed++;
+
+  if (test('CI runs for release branches and version tags before release workflows execute', () => {
+    const pushBlockMatch = normalizedCiWorkflowSource.match(/on:\n\s+push:\n([\s\S]*?)\n\s+pull_request:/);
+    const pushBlock = pushBlockMatch ? pushBlockMatch[1] : '';
+
+    assert.ok(pushBlock, 'ci.yml should define a push trigger block');
+    assert.match(
+      pushBlock,
+      /branches:\s*\[[^\]]*main[^\]]*['"]release\/\*\*['"][^\]]*\]/,
+      'ci.yml push branches should include release/**'
+    );
+    assert.match(
+      pushBlock,
+      /tags:\s*\[[^\]]*['"]v\*['"][^\]]*\]/,
+      'ci.yml push tags should include v*'
     );
   })) passed++; else failed++;
 

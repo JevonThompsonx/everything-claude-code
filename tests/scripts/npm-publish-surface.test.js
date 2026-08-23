@@ -42,33 +42,79 @@ function buildExpectedPublishPaths(repoRoot) {
   const extraPaths = [
     "manifests",
     "scripts/ecc.js",
+    "scripts/feedback.js",
     "scripts/catalog.js",
-    "scripts/claw.js",
+    "scripts/ci/scan-supply-chain-iocs.js",
+    "scripts/ci/supply-chain-advisory-sources.js",
+    "scripts/consult.js",
+    "scripts/control-pane.js",
+    "scripts/dashboard-web.js",
+    "scripts/discussion-audit.js",
     "scripts/doctor.js",
     "scripts/status.js",
     "scripts/sessions-cli.js",
+    "scripts/work-items.js",
     "scripts/install-apply.js",
+    "scripts/install-guided.js",
     "scripts/install-plan.js",
+    "scripts/ito.js",
     "scripts/list-installed.js",
+    "scripts/loop-status.js",
+    "scripts/memory.js",
+    "scripts/memory-mcp.mjs",
+    "scripts/nasiko.js",
+    "scripts/observability-readiness.js",
+    "scripts/plan-canvas.js",
+    "scripts/operator-readiness-dashboard.js",
+    "scripts/platform-audit.js",
+    "scripts/preview-pack-smoke.js",
+    "scripts/release-approval-gate.js",
+    "scripts/release-video-suite.js",
     "scripts/skill-create-output.js",
     "scripts/repair.js",
-    "scripts/harness-audit.js",
+    "scripts/harness-adapter-compliance.js",
     "scripts/session-inspect.js",
+    "scripts/setup.js",
     "scripts/uninstall.js",
+    "scripts/welcome.js",
     "scripts/gemini-adapt-agents.js",
+    "scripts/sync-ecc-to-codex.sh",
+    "scripts/codex/legacy-sync-state.js",
+    "scripts/codex/install-global-git-hooks.sh",
+    "scripts/codex/check-codex-global-state.sh",
+    "scripts/codex-git-hooks",
+    "scripts/codex/check-plugin-cache.js",
     "scripts/codex/merge-codex-config.js",
     "scripts/codex/merge-mcp-config.js",
     ".codex-plugin",
+    "plugins/ecc",
     ".mcp.json",
     "install.sh",
     "install.ps1",
     "schemas",
     "agent.yaml",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    "COMMANDS-QUICK-REF.md",
+    "CONTRIBUTING.md",
     "VERSION",
+    "assets/ecc-icon.svg",
+    "assets/hero.png",
+    "assets/images/community",
+    "docs/CODEX-NAVIGATION-GUIDE.md",
+    "docs/COMMAND-AGENT-MAP.md",
+    "docs/design/ecc-memory-vault.md",
+    "assets/images/sponsors",
+  ]
+  const exclusionPaths = [
+    "!**/__pycache__/**",
+    "!**/*.pyc",
+    "!**/*.pyo",
+    "!**/*.pyd",
+    "!**/.pytest_cache/**",
   ]
 
   const combined = new Set(
-    [...modules.flatMap((module) => module.paths || []), ...extraPaths].map(normalizePublishPath)
+    [...modules.flatMap((module) => module.paths || []), ...extraPaths, ...exclusionPaths].map(normalizePublishPath)
   )
 
   return [...combined]
@@ -107,11 +153,55 @@ function main() {
 
       for (const requiredPath of [
         "scripts/catalog.js",
+        "scripts/ci/scan-supply-chain-iocs.js",
+        "scripts/ci/supply-chain-advisory-sources.js",
+        "scripts/consult.js",
+        "scripts/control-pane.js",
+        "scripts/feedback.js",
+        "scripts/ito.js",
+        "scripts/memory.js",
+        "scripts/memory-mcp.mjs",
+        "scripts/nasiko.js",
+        "scripts/lib/nasiko-release.js",
+        "scripts/lib/memory-vault-format.js",
+        "scripts/lib/memory-vault.js",
+        "scripts/discussion-audit.js",
+        "scripts/operator-readiness-dashboard.js",
+        "scripts/preview-pack-smoke.js",
+        "scripts/release-approval-gate.js",
+        "scripts/release-video-suite.js",
+        "scripts/work-items.js",
+        "scripts/platform-audit.js",
+        "scripts/sync-ecc-to-codex.sh",
+        "scripts/codex/legacy-sync-state.js",
+        "scripts/codex/install-global-git-hooks.sh",
+        "scripts/codex/check-codex-global-state.sh",
+        "scripts/codex-git-hooks/pre-commit",
+        "scripts/codex-git-hooks/pre-push",
+        "scripts/setup.js",
+        "scripts/codex/check-plugin-cache.js",
         ".gemini/GEMINI.md",
+        ".qwen/QWEN.md",
         ".claude-plugin/plugin.json",
+        ".github/PULL_REQUEST_TEMPLATE.md",
         ".codex-plugin/plugin.json",
+        ".agents/skills/unified-memory/SKILL.md",
+        ".agents/skills/unified-memory/agents/openai.yaml",
+        ".cursor/skills/unified-memory/SKILL.md",
+        "COMMANDS-QUICK-REF.md",
+        "CONTRIBUTING.md",
+        "plugins/ecc/.codex-plugin/plugin.json",
+        "assets/ecc-icon.svg",
+        "assets/hero.png",
+        "assets/images/community/discord.svg",
+        "assets/images/community/heart.svg",
+        "docs/CODEX-NAVIGATION-GUIDE.md",
+        "docs/COMMAND-AGENT-MAP.md",
+        "docs/design/ecc-memory-vault.md",
         "schemas/install-state.schema.json",
+        "schemas/memory.schema.json",
         "skills/backend-patterns/SKILL.md",
+        "skills/unified-memory/SKILL.md",
       ]) {
         assert.ok(
           packagedPaths.has(requiredPath),
@@ -129,6 +219,17 @@ function main() {
         assert.ok(
           !packagedPaths.has(excludedPath),
           `npm pack should not include ${excludedPath}`
+        )
+      }
+
+      for (const packagedPath of packagedPaths) {
+        assert.ok(
+          !packagedPath.includes("__pycache__/"),
+          `npm pack should not include Python bytecode cache path ${packagedPath}`
+        )
+        assert.ok(
+          !/\.py[cod]$/.test(packagedPath),
+          `npm pack should not include Python bytecode file ${packagedPath}`
         )
       }
     }],

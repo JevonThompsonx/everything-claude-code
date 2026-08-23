@@ -23,6 +23,11 @@
   "plugin": [
     "./plugins"
   ],
+  "skills": {
+    "paths": [
+      "../skills"
+    ]
+  },
   "agent": {
     "build": {
       "description": "Primary coding agent for development work.",
@@ -186,6 +191,18 @@
       "mode": "subagent",
       "model": "github-copilot/gpt-5.4",
       "prompt": "{file:prompts/agents/loop-operator.txt}"
+    },
+    "php-reviewer": {
+      "description": "Expert PHP code reviewer specializing in PSR-12 compliance, PHP type system, Eloquent ORM patterns, security, and performance.",
+      "mode": "subagent",
+      "model": "anthropic/claude-opus-4-5",
+      "prompt": "{file:prompts/agents/php-reviewer.txt}",
+      "tools": {
+        "read": true,
+        "bash": true,
+        "write": false,
+        "edit": false
+      }
     },
     "python-reviewer": {
       "description": "Expert Python reviewer for Pythonic design, typing, maintainability, security, and performance.",
